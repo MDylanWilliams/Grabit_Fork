@@ -88,15 +88,6 @@ func strToFileMode(perm string) (os.FileMode, error) {
 	return os.FileMode(parsed), nil
 }
 
-// Adds commas to number string at hundreds place, thousands place, etc.
-// Ex: "12345678" -> "12,345,678"
-func AddCommas(str string) string {
-	for i := len(str) - 3; i >= 0; i -= 3 {
-		str = str[:i] + "," + str[i:]
-	}
-	return str
-}
-
 // Download gets all the resources in this lock file and moves them to
 // the destination directory.
 func (l *Lock) Download(dir string, tags []string, notags []string, perm string, bar bool) error {
@@ -170,7 +161,7 @@ func (l *Lock) Download(dir string, tags []string, notags []string, perm string,
 		//Loop through resources, fetching their metadata and totalling up their sizes in bytes.
 		//This is not in a goroutine because a resource may finish downloading before its size has been calculated.
 		//For now, we'll first calculate sizes, then begin downloading.
-		fmt.Print(Color_Text("\rFetching file sizes...", "yellow"))
+		fmt.Print(ColorText("\rFetching file sizes...", "yellow"))
 
 		var totalBytes int64 = 0
 		for _, r := range filteredResources {
@@ -263,7 +254,7 @@ func (l *Lock) Download(dir string, tags []string, notags []string, perm string,
 				pad := "          "
 				line := "\r" + spinner + barStr + pad + completeStr + pad + byteStr + pad + elapsedStr //"\r" lets us clear the line.
 
-				fmt.Print(Color_Text(line, color))
+				fmt.Print(ColorText(line, color))
 
 				if resourcesDownloaded == len(filteredResources) {
 					fmt.Println()
