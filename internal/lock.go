@@ -88,6 +88,15 @@ func strToFileMode(perm string) (os.FileMode, error) {
 	return os.FileMode(parsed), nil
 }
 
+// Adds commas to number string at hundreds place, thousands place, etc.
+// Ex: "12345678" -> "12,345,678"
+func AddCommas(str string) string {
+	for i := len(str) - 3; i >= 0; i -= 3 {
+		str = str[:i] + "," + str[i:]
+	}
+	return str
+}
+
 // Download gets all the resources in this lock file and moves them to
 // the destination directory.
 func (l *Lock) Download(dir string, tags []string, notags []string, perm string, bar bool) error {
@@ -158,42 +167,39 @@ func (l *Lock) Download(dir string, tags []string, notags []string, perm string,
 	if bar {
 		startTime := time.Now()
 
-		spinChars := [5]string{"-", "\\", "|", "/", "-"}
-		spinI := 0 //Current char in spinChars.
-
-		//SPINNER GOROUTINE.
-		ticker := time.NewTicker(60 * time.Millisecond)
-		go func() {
-			//The progress bar goroutine blocks and waits for items to enter the progressCh channel.
-			//So the spinner would only update when a download completes (when a download completes, it places a 1 in progressCh)
-			//We want the spinner to continuously update, so we continuously feed in 0's to the progressCh channel (every 50 milliseconds).
-			//This keeps the goroutine running and printing, and the extra 0's don't change downloadTotal.
-			for {
-				select {
-				case <-ticker.C:
-					byteCh <- 0
-				}
-			}
-		}()
-
-		var totalBytes int64 = 0
 		//Loop through resources, fetching their metadata and totalling up their sizes in bytes.
 		//This is not in a goroutine because a resource may finish downloading before its size has been calculated.
-		//For now, we'll pre-calculate the sizes.
+		//For now, we'll first calculate sizes, then begin downloading.
 		fmt.Print(Color_Text("\rFetching file sizes...", "yellow"))
+
+		var totalBytes int64 = 0
 		for _, r := range filteredResources {
 			resource := r
 			httpClient := &http.Client{Timeout: 10 * time.Second}
 			resp, err := httpClient.Head(resource.Urls[0])
 			if err != nil {
 				//errorCh <- err	We don't want a failed fetch to crash the whole program -- it is not crucial to know the total download size.
-				//Instead, the print goroutine will read this -1 and notify the user by printing an error message while everything continues as usual.
-				totalBytes = -1
+				//Instead, the print goroutine will check length of resourceSizes and notify the user by printing an error message in place of the byte counter.
 				break
 			}
 			totalBytes += resp.ContentLength
 			resourceSizes = append(resourceSizes, resp.ContentLength)
 		}
+
+		spinChars := [5]string{"-", "\\", "|", "/", "-"}
+		spinI := 0 //Current char in spinChars.
+
+		//SPINNER GOROUTINE.
+		ticker := time.NewTicker(60 * time.Millisecond)
+		go func() {
+			//Continuously place garbage value (-1) in channel to prevent print goroutine from blocking and keep the spinner updating.
+			for {
+				select {
+				case <-ticker.C:
+					byteCh <- -1
+				}
+			}
+		}()
 
 		//PRINT GOROUTINE.
 		go func() {
@@ -202,7 +208,7 @@ func (l *Lock) Download(dir string, tags []string, notags []string, perm string,
 
 			for {
 				b := <-byteCh
-				if b != 0 { //if a resource just finished downloading.
+				if b != -1 {
 					resourcesDownloaded += 1
 					bytesDownloaded += b
 				}
@@ -242,14 +248,14 @@ func (l *Lock) Download(dir string, tags []string, notags []string, perm string,
 				}
 				barStr += "║"
 
-				//<bytes downloaded> / <total bytes>
-				byteStr := strconv.Itoa(int(bytesDownloaded)) + "B / "
-				if totalBytes != -1 {
-					byteStr += strconv.Itoa(int(totalBytes)) + "B"
-				} else {
-					byteStr += "<ERROR FETCHING BYTE TOTALS>"
-				}
 				completeStr := strconv.Itoa(resourcesDownloaded) + "/" + strconv.Itoa(len(filteredResources)) + " Complete"
+
+				var byteStr string
+				if len(resourceSizes) == len(filteredResources) {
+					byteStr = AddCommas(strconv.Itoa(int(bytesDownloaded))) + "B / " + byteStr + AddCommas(strconv.Itoa(int(totalBytes))) + "B"
+				} else {
+					byteStr = "<ERROR FETCHING RESOURCE SIZES>"
+				}
 
 				elapsedStr := strconv.Itoa(int(time.Now().Sub(startTime).Round(time.Second).Seconds())) + "s Elapsed"
 
@@ -274,8 +280,11 @@ func (l *Lock) Download(dir string, tags []string, notags []string, perm string,
 
 			errorCh <- err
 
-			byteCh <- resourceSizes[i]
-
+			if len(resourceSizes) == len(filteredResources) {
+				byteCh <- resourceSizes[i]
+			} else {
+				byteCh <- 0
+			}
 		}()
 	}
 	done := 0
