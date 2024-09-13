@@ -7,10 +7,8 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"strconv"
-	"time"
 
 	toml "github.com/pelletier/go-toml/v2"
 )
@@ -152,130 +150,20 @@ func (l *Lock) Download(dir string, tags []string, notags []string, perm string,
 	}
 	errorCh := make(chan error, total)
 
-	byteCh := make(chan int64)
-	resourceSizes := make([]int64, 0, len(filteredResources))
+	status_line := Status_line{filteredResources, make(chan int)}
 
 	if bar {
-		startTime := time.Now()
-
-		//Loop through resources, fetching their metadata and totalling up their sizes in bytes.
-		//This is not in a goroutine because a resource may finish downloading before its size has been calculated.
-		//For now, we'll first calculate sizes, then begin downloading.
-		fmt.Print(ColorText("\rFetching file sizes...", "yellow"))
-
-		var totalBytes int64 = 0
-		for _, r := range filteredResources {
-			resource := r
-			httpClient := &http.Client{Timeout: 10 * time.Second}
-			resp, err := httpClient.Head(resource.Urls[0])
-			if err != nil {
-				//errorCh <- err	We don't want a failed fetch to crash the whole program -- it is not crucial to know the total download size.
-				//Instead, the print goroutine will check length of resourceSizes and notify the user by printing an error message in place of the byte counter.
-				break
-			}
-			totalBytes += resp.ContentLength
-			resourceSizes = append(resourceSizes, resp.ContentLength)
-		}
-
-		spinChars := [5]string{"-", "\\", "|", "/", "-"}
-		spinI := 0 //Current char in spinChars.
-
-		//SPINNER GOROUTINE.
-		ticker := time.NewTicker(60 * time.Millisecond)
-		go func() {
-			//Continuously place garbage value (-1) in channel to prevent print goroutine from blocking and keep the spinner updating.
-			for {
-				select {
-				case <-ticker.C:
-					byteCh <- -1
-				}
-			}
-		}()
-
-		//PRINT GOROUTINE.
-		go func() {
-			resourcesDownloaded := 0
-			var bytesDownloaded int64 = 0
-
-			for {
-				b := <-byteCh
-				if b != -1 {
-					resourcesDownloaded += 1
-					bytesDownloaded += b
-				}
-
-				//Spinner loops through chars in spinChars to give the impression it is rotating.
-				var spinner string
-				if resourcesDownloaded < len(filteredResources) {
-					spinner = spinChars[spinI]
-					spinI += 1
-					if spinI == len(spinChars) {
-						spinI = 0
-					}
-				} else {
-					spinner = "✔"
-				}
-
-				//Line is yellow while downloading, green when complete.
-				var color string
-				if resourcesDownloaded < len(filteredResources) {
-					color = "yellow"
-				} else {
-					color = "green"
-				}
-
-				//Build progress bar string.
-				barStr := "║"
-				for i := 0; i < resourcesDownloaded; i += 1 {
-					barStr += "█"
-				}
-
-				if resourcesDownloaded < len(filteredResources) {
-					barStr += "░"
-				}
-
-				for i := resourcesDownloaded + 1; i < len(filteredResources); i += 1 {
-					barStr += "_"
-				}
-				barStr += "║"
-
-				completeStr := strconv.Itoa(resourcesDownloaded) + "/" + strconv.Itoa(len(filteredResources)) + " Complete"
-
-				var byteStr string
-				if len(resourceSizes) == len(filteredResources) {
-					byteStr = AddCommas(strconv.Itoa(int(bytesDownloaded))) + "B / " + byteStr + AddCommas(strconv.Itoa(int(totalBytes))) + "B"
-				} else {
-					byteStr = "<ERROR FETCHING RESOURCE SIZES>"
-				}
-
-				elapsedStr := strconv.Itoa(int(time.Now().Sub(startTime).Round(time.Second).Seconds())) + "s Elapsed"
-
-				//Build and print line.
-				pad := "          "
-				line := "\r" + spinner + barStr + pad + completeStr + pad + byteStr + pad + elapsedStr //"\r" lets us clear the line.
-
-				fmt.Print(ColorText(line, color))
-
-				if resourcesDownloaded == len(filteredResources) {
-					fmt.Println()
-					break
-				}
-			}
-		}()
+		status_line.run()
 	}
+
 	for i, r := range filteredResources {
 		resource := r
 		go func() {
 
 			err := resource.Download(dir, mode, ctx)
-
 			errorCh <- err
 
-			if len(resourceSizes) == len(filteredResources) {
-				byteCh <- resourceSizes[i]
-			} else {
-				byteCh <- 0
-			}
+			status_line.indexCh <- i
 		}()
 	}
 	done := 0
