@@ -15,8 +15,8 @@ type Status_Line struct {
 func (st *Status_Line) run() {
 	startTime := time.Now()
 
-	resourceSizes, totalBytes, sizingSuccess := getResourcesSizes(st)
-	startSpinner(st, 50)
+	resourceSizes, totalBytes, sizingSuccess := getResourcesSizes(st, 10000)
+	startTicker(st)
 
 	var bytesDownloaded int64
 	resourcesDownloaded := 0
@@ -36,7 +36,7 @@ func (st *Status_Line) run() {
 				spinI = 0
 			}
 
-			line := composeStatusString(st, bytesDownloaded, totalBytes, resourcesDownloaded, resourceSizes, sizingSuccess, spinChars[:], spinI, startTime, anyRemaining)
+			line := composeStatusString(st, bytesDownloaded, totalBytes, resourcesDownloaded, sizingSuccess, spinChars[:], spinI, startTime, anyRemaining)
 			fmt.Print(line)
 			if !anyRemaining {
 				fmt.Println()
@@ -48,7 +48,7 @@ func (st *Status_Line) run() {
 
 }
 
-func getResourcesSizes(st *Status_Line) ([]int64, int64, bool) {
+func getResourcesSizes(st *Status_Line, timeoutMs int) ([]int64, int64, bool) {
 	fmt.Print(ColorText("\rFetching resource sizes...", "yellow"))
 	resourceSizes := make([]int64, len(st.resources))
 	for i := 0; i < len(resourceSizes); i++ {
@@ -58,7 +58,7 @@ func getResourcesSizes(st *Status_Line) ([]int64, int64, bool) {
 	sizingSuccess := true
 	for i, r := range st.resources {
 		resource := r
-		httpClient := &http.Client{Timeout: 10 * time.Second}
+		httpClient := &http.Client{Timeout: time.Duration(timeoutMs) * time.Millisecond}
 		resp, err := httpClient.Head(resource.Urls[0])
 		if err != nil {
 			sizingSuccess = false
@@ -71,8 +71,8 @@ func getResourcesSizes(st *Status_Line) ([]int64, int64, bool) {
 	return resourceSizes, totalBytes, sizingSuccess
 }
 
-func startSpinner(st *Status_Line, msTick int) {
-	ticker := time.NewTicker(time.Duration(msTick) * time.Millisecond)
+func startTicker(st *Status_Line) {
+	ticker := time.NewTicker(50 * time.Millisecond)
 	go func() {
 		for {
 			select {
@@ -83,8 +83,7 @@ func startSpinner(st *Status_Line, msTick int) {
 	}()
 }
 
-func composeStatusString(st *Status_Line, bytesDownloaded int64, totalBytes int64, resourcesDownloaded int,
-	resourceSizes []int64, sizingSuccess bool, spinChars []string, spinI int, startTime time.Time, anyRemaining bool) string {
+func composeStatusString(st *Status_Line, bytesDownloaded int64, totalBytes int64, resourcesDownloaded int, sizingSuccess bool, spinChars []string, spinI int, startTime time.Time, anyRemaining bool) string {
 
 	var spinner string
 	if anyRemaining {
@@ -111,7 +110,7 @@ func composeStatusString(st *Status_Line, bytesDownloaded int64, totalBytes int6
 	if sizingSuccess {
 		byteStr = AddCommas(strconv.Itoa(int(bytesDownloaded))) + "B / " + byteStr + AddCommas(strconv.Itoa(int(totalBytes))) + "B"
 	} else {
-		byteStr = "<ISSUE FETCHING RESOURCE SIZES>"
+		byteStr = "<issue_fetching_resource_sizes>"
 	}
 
 	elapsedStr := strconv.Itoa(int(time.Since(startTime).Round(time.Second).Seconds())) + "s Elapsed"
