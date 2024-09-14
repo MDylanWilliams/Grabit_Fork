@@ -15,7 +15,40 @@ type Status_Line struct {
 func (st *Status_Line) run() {
 	startTime := time.Now()
 
-	//Get file sizes.
+	resourceSizes, totalBytes, sizingSuccess := getResourcesSizes(st)
+	startSpinner(st, 50)
+
+	var bytesDownloaded int64
+	resourcesDownloaded := 0
+	go func() {
+		spinChars := [5]string{"-", "\\", "|", "/", "-"}
+		spinI := 0
+
+		for {
+			if i := <-st.indexCh; i != -1 {
+				bytesDownloaded += resourceSizes[i]
+				resourcesDownloaded++
+			}
+			anyRemaining := resourcesDownloaded < len(st.resources)
+
+			spinI += 1
+			if spinI == len(spinChars) {
+				spinI = 0
+			}
+
+			line := composeStatusString(st, bytesDownloaded, totalBytes, resourcesDownloaded, resourceSizes, sizingSuccess, spinChars[:], spinI, startTime, anyRemaining)
+			fmt.Print(line)
+			if !anyRemaining {
+				fmt.Println()
+				break
+			}
+
+		}
+	}()
+
+}
+
+func getResourcesSizes(st *Status_Line) ([]int64, int64, bool) {
 	fmt.Print(ColorText("\rFetching resource sizes...", "yellow"))
 	resourceSizes := make([]int64, len(st.resources))
 	for i := 0; i < len(resourceSizes); i++ {
@@ -35,7 +68,11 @@ func (st *Status_Line) run() {
 		resourceSizes[i] = resp.ContentLength
 	}
 
-	ticker := time.NewTicker(100 * time.Millisecond)
+	return resourceSizes, totalBytes, sizingSuccess
+}
+
+func startSpinner(st *Status_Line, msTick int) {
+	ticker := time.NewTicker(time.Duration(msTick) * time.Millisecond)
 	go func() {
 		for {
 			select {
@@ -44,71 +81,51 @@ func (st *Status_Line) run() {
 			}
 		}
 	}()
+}
 
-	var bytesDownloaded int64
-	resourcesDownloaded := 0
-	go func() {
-		spinChars := [5]string{"-", "\\", "|", "/", "-"}
-		spinI := 0
+func composeStatusString(st *Status_Line, bytesDownloaded int64, totalBytes int64, resourcesDownloaded int,
+	resourceSizes []int64, sizingSuccess bool, spinChars []string, spinI int, startTime time.Time, anyRemaining bool) string {
 
-		for {
-			if i := <-st.indexCh; i != -1 {
-				bytesDownloaded += resourceSizes[i]
-				resourcesDownloaded++
-			}
-			anyRemaining := resourcesDownloaded < len(st.resources)
+	var spinner string
+	if anyRemaining {
+		spinner = spinChars[spinI]
+	} else {
+		spinner = "✔"
+	}
 
-			var spinner string
-			if anyRemaining {
-				spinner = spinChars[spinI]
-				spinI += 1
-				if spinI == len(spinChars) {
-					spinI = 0
-				}
-			} else {
-				spinner = "✔"
-			}
+	barStr := "║"
+	for i := 0; i < resourcesDownloaded; i += 1 {
+		barStr += "█"
+	}
+	if resourcesDownloaded < len(st.resources) {
+		barStr += "░"
+	}
+	for i := resourcesDownloaded + 1; i < len(st.resources); i += 1 {
+		barStr += "_"
+	}
+	barStr += "║"
 
-			barStr := "║"
-			for i := 0; i < resourcesDownloaded; i += 1 {
-				barStr += "█"
-			}
-			if resourcesDownloaded < len(st.resources) {
-				barStr += "░"
-			}
-			for i := resourcesDownloaded + 1; i < len(st.resources); i += 1 {
-				barStr += "_"
-			}
-			barStr += "║"
+	completeStr := strconv.Itoa(resourcesDownloaded) + "/" + strconv.Itoa(len(st.resources)) + " Complete"
 
-			completeStr := strconv.Itoa(resourcesDownloaded) + "/" + strconv.Itoa(len(st.resources)) + " Complete"
+	var byteStr string
+	if sizingSuccess {
+		byteStr = AddCommas(strconv.Itoa(int(bytesDownloaded))) + "B / " + byteStr + AddCommas(strconv.Itoa(int(totalBytes))) + "B"
+	} else {
+		byteStr = "<ISSUE FETCHING RESOURCE SIZES>"
+	}
 
-			var byteStr string
-			if sizingSuccess {
-				byteStr = AddCommas(strconv.Itoa(int(bytesDownloaded))) + "B / " + byteStr + AddCommas(strconv.Itoa(int(totalBytes))) + "B"
-			} else {
-				byteStr = "<ISSUE FETCHING RESOURCE SIZES>"
-			}
+	elapsedStr := strconv.Itoa(int(time.Since(startTime).Round(time.Second).Seconds())) + "s Elapsed"
 
-			elapsedStr := strconv.Itoa(int(time.Since(startTime).Round(time.Second).Seconds())) + "s Elapsed"
+	var color string
+	if anyRemaining {
+		color = "yellow"
+	} else {
+		color = "green"
+	}
 
-			var color string
-			if anyRemaining {
-				color = "yellow"
-			} else {
-				color = "green"
-			}
+	pad := "          "
+	line := "\r" + spinner + barStr + pad + completeStr + pad + byteStr + pad + elapsedStr //"\r" lets us clear the line.
+	line = ColorText(line, color)
 
-			pad := "          "
-			line := "\r" + spinner + barStr + pad + completeStr + pad + byteStr + pad + elapsedStr //"\r" lets us clear the line.
-			fmt.Print(ColorText(line, color))
-
-			if !anyRemaining {
-				fmt.Println()
-				break
-			}
-
-		}
-	}()
-
+	return line
 }

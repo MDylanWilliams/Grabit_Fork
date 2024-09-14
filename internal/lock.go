@@ -150,7 +150,7 @@ func (l *Lock) Download(dir string, tags []string, notags []string, perm string,
 	}
 	errorCh := make(chan error, total)
 
-	status_line := Status_line{filteredResources, make(chan int)}
+	status_line := Status_Line{filteredResources, make(chan int)}
 
 	if bar {
 		status_line.run()
