@@ -36,7 +36,7 @@ func (st *Status_Line) run() {
 				spinI = 0
 			}
 
-			line := composeStatusString(st, bytesDownloaded, totalBytes, resourcesDownloaded, sizingSuccess, spinChars[:], spinI, startTime, anyRemaining)
+			line := composeStatusString(bytesDownloaded, totalBytes, resourcesDownloaded, len(st.resources), sizingSuccess, spinChars[:], spinI, startTime, anyRemaining)
 			fmt.Print(line)
 			if !anyRemaining {
 				fmt.Println()
@@ -83,7 +83,7 @@ func startTicker(st *Status_Line) {
 	}()
 }
 
-func composeStatusString(st *Status_Line, bytesDownloaded int64, totalBytes int64, resourcesDownloaded int, sizingSuccess bool, spinChars []string, spinI int, startTime time.Time, anyRemaining bool) string {
+func composeStatusString(bytesDownloaded int64, totalBytes int64, resourcesDownloaded int, numResources int, sizingSuccess bool, spinChars []string, spinI int, startTime time.Time, anyRemaining bool) string {
 
 	var spinner string
 	if anyRemaining {
@@ -96,15 +96,15 @@ func composeStatusString(st *Status_Line, bytesDownloaded int64, totalBytes int6
 	for i := 0; i < resourcesDownloaded; i += 1 {
 		barStr += "█"
 	}
-	if resourcesDownloaded < len(st.resources) {
+	if resourcesDownloaded < numResources {
 		barStr += "░"
 	}
-	for i := resourcesDownloaded + 1; i < len(st.resources); i += 1 {
+	for i := resourcesDownloaded + 1; i < numResources; i += 1 {
 		barStr += "_"
 	}
 	barStr += "║"
 
-	completeStr := strconv.Itoa(resourcesDownloaded) + "/" + strconv.Itoa(len(st.resources)) + " Complete"
+	completeStr := strconv.Itoa(resourcesDownloaded) + "/" + strconv.Itoa(numResources) + " Complete"
 
 	var byteStr string
 	if sizingSuccess {
