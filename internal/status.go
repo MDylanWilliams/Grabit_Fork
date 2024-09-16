@@ -92,17 +92,17 @@ func composeStatusString(bytesDownloaded int64, totalBytes int64, resourcesDownl
 		spinner = "✔"
 	}
 
-	barStr := "║"
+	barStr := "["
 	for i := 0; i < resourcesDownloaded; i += 1 {
 		barStr += "█"
 	}
 	if resourcesDownloaded < numResources {
-		barStr += "░"
+		barStr += " "
 	}
 	for i := resourcesDownloaded + 1; i < numResources; i += 1 {
-		barStr += "_"
+		barStr += " "
 	}
-	barStr += "║"
+	barStr += "]"
 
 	completeStr := strconv.Itoa(resourcesDownloaded) + "/" + strconv.Itoa(numResources) + " Complete"
 
