@@ -49,7 +49,7 @@ func (st *Status_Line) run() {
 }
 
 func getResourcesSizes(st *Status_Line, timeoutMs int) ([]int64, int64, bool) {
-	fmt.Print(ColorText("\rFetching resource sizes...", "yellow"))
+	fmt.Print("\rFetching resource sizes...")
 	resourceSizes := make([]int64, len(st.resources))
 	for i := 0; i < len(resourceSizes); i++ {
 		resourceSizes[i] = 0
@@ -115,16 +115,17 @@ func composeStatusString(bytesDownloaded int64, totalBytes int64, resourcesDownl
 
 	elapsedStr := strconv.Itoa(int(time.Since(startTime).Round(time.Second).Seconds())) + "s Elapsed"
 
-	var color string
-	if anyRemaining {
-		color = "yellow"
-	} else {
-		color = "green"
-	}
-
 	pad := "          "
 	line := "\r" + spinner + barStr + pad + completeStr + pad + byteStr + pad + elapsedStr //"\r" lets us clear the line.
-	line = ColorText(line, color)
 
 	return line
+}
+
+// Adds commas to number string at hundreds place, thousands place, etc.
+// Ex: "12345678" -> "12,345,678"
+func AddCommas(str string) string {
+	for i := len(str) - 3; i >= 0; i -= 3 {
+		str = str[:i] + "," + str[i:]
+	}
+	return str
 }
