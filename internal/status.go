@@ -7,25 +7,31 @@ import (
 	"time"
 )
 
-type Status_Line struct {
+type StatusLine struct {
 	resources []Resource
 	indexCh   chan int
 }
 
-func (st *Status_Line) run() {
+var spinChars = [5]string{"-", "\\", "|", "/", "-"}
+
+func (st *StatusLine) run() {
 	startTime := time.Now()
 
 	resourceSizes, totalBytes, sizingSuccess := getResourcesSizes(st, 10000)
-	startTicker(st)
 
 	var bytesDownloaded int64
 	resourcesDownloaded := 0
 	go func() {
-		spinChars := [5]string{"-", "\\", "|", "/", "-"}
 		spinI := 0
 
 		for {
-			if i := <-st.indexCh; i != -1 {
+			var i int
+			select {
+			case i = <-st.indexCh:
+			case <-time.After(50 * time.Millisecond):
+				i = -1
+			}
+			if i != -1 {
 				bytesDownloaded += resourceSizes[i]
 				resourcesDownloaded++
 			}
@@ -48,7 +54,7 @@ func (st *Status_Line) run() {
 
 }
 
-func getResourcesSizes(st *Status_Line, timeoutMs int) ([]int64, int64, bool) {
+func getResourcesSizes(st *StatusLine, timeoutMs int) ([]int64, int64, bool) {
 	fmt.Print("\rFetching resource sizes...")
 	resourceSizes := make([]int64, len(st.resources))
 	for i := 0; i < len(resourceSizes); i++ {
@@ -71,20 +77,7 @@ func getResourcesSizes(st *Status_Line, timeoutMs int) ([]int64, int64, bool) {
 	return resourceSizes, totalBytes, sizingSuccess
 }
 
-func startTicker(st *Status_Line) {
-	ticker := time.NewTicker(50 * time.Millisecond)
-	go func() {
-		for {
-			select {
-			case <-ticker.C:
-				st.indexCh <- -1
-			}
-		}
-	}()
-}
-
 func composeStatusString(bytesDownloaded int64, totalBytes int64, resourcesDownloaded int, numResources int, sizingSuccess bool, spinChars []string, spinI int, startTime time.Time, anyRemaining bool) string {
-
 	var spinner string
 	if anyRemaining {
 		spinner = spinChars[spinI]
@@ -116,7 +109,7 @@ func composeStatusString(bytesDownloaded int64, totalBytes int64, resourcesDownl
 	elapsedStr := strconv.Itoa(int(time.Since(startTime).Round(time.Second).Seconds())) + "s Elapsed"
 
 	pad := "          "
-	line := "\r" + spinner + barStr + pad + completeStr + pad + byteStr + pad + elapsedStr //"\r" lets us clear the line.
+	line := "\r" + spinner + barStr + pad + completeStr + pad + byteStr + pad + elapsedStr // "\r" lets us clear the line.
 
 	return line
 }
@@ -124,7 +117,7 @@ func composeStatusString(bytesDownloaded int64, totalBytes int64, resourcesDownl
 // Adds commas to number string at hundreds place, thousands place, etc.
 // Ex: "12345678" -> "12,345,678"
 func AddCommas(str string) string {
-	for i := len(str) - 3; i >= 0; i -= 3 {
+	for i := len(str) - 3; i >= 1; i -= 3 {
 		str = str[:i] + "," + str[i:]
 	}
 	return str
