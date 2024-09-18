@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/dustin/go-humanize"
 )
 
 type StatusLine struct {
@@ -97,11 +99,11 @@ func composeStatusString(bytesDownloaded int64, totalBytes int64, resourcesDownl
 	}
 	barStr += "]"
 
-	completeStr := strconv.Itoa(resourcesDownloaded) + "/" + strconv.Itoa(numResources) + " Complete"
+	completeStr := strconv.Itoa(resourcesDownloaded) + "/" + strconv.Itoa(numResources) + " Resources"
 
 	var byteStr string
 	if sizingSuccess {
-		byteStr = AddCommas(strconv.Itoa(int(bytesDownloaded))) + "B / " + byteStr + AddCommas(strconv.Itoa(int(totalBytes))) + "B"
+		byteStr = humanize.Bytes(uint64(bytesDownloaded)) + " / " + humanize.Bytes(uint64(totalBytes))
 	} else {
 		byteStr = "<issue_fetching_resource_sizes>"
 	}
@@ -112,13 +114,4 @@ func composeStatusString(bytesDownloaded int64, totalBytes int64, resourcesDownl
 	line := "\r" + spinner + barStr + pad + completeStr + pad + byteStr + pad + elapsedStr // "\r" lets us clear the line.
 
 	return line
-}
-
-// Adds commas to number string at hundreds place, thousands place, etc.
-// Ex: "12345678" -> "12,345,678"
-func AddCommas(str string) string {
-	for i := len(str) - 3; i >= 1; i -= 3 {
-		str = str[:i] + "," + str[i:]
-	}
-	return str
 }
