@@ -44,7 +44,7 @@ func (st *StatusLine) run() {
 				spinI = 0
 			}
 
-			line := composeStatusString(bytesDownloaded, totalBytes, resourcesDownloaded, len(st.resources), sizingSuccess, spinChars[:], spinI, startTime, anyRemaining)
+			line := composeStatusString(bytesDownloaded, totalBytes, resourcesDownloaded, len(st.resources), sizingSuccess, spinChars[:], spinI, startTime, anyRemaining, 20)
 			fmt.Print(line)
 			if !anyRemaining {
 				fmt.Println()
@@ -79,7 +79,7 @@ func getResourcesSizes(st *StatusLine, timeoutMs int) ([]int64, int64, bool) {
 	return resourceSizes, totalBytes, sizingSuccess
 }
 
-func composeStatusString(bytesDownloaded int64, totalBytes int64, resourcesDownloaded int, numResources int, sizingSuccess bool, spinChars []string, spinI int, startTime time.Time, anyRemaining bool) string {
+func composeStatusString(bytesDownloaded int64, totalBytes int64, resourcesDownloaded int, numResources int, sizingSuccess bool, spinChars []string, spinI int, startTime time.Time, anyRemaining bool, barLength int) string {
 	var spinner string
 	if anyRemaining {
 		spinner = spinChars[spinI]
@@ -88,13 +88,14 @@ func composeStatusString(bytesDownloaded int64, totalBytes int64, resourcesDownl
 	}
 
 	barStr := "["
-	for i := 0; i < resourcesDownloaded; i += 1 {
+	squareSize := totalBytes / int64(barLength)
+	for i := 0; i < int(bytesDownloaded/squareSize); i += 1 {
 		barStr += "█"
 	}
 	if resourcesDownloaded < numResources {
 		barStr += " "
 	}
-	for i := resourcesDownloaded + 1; i < numResources; i += 1 {
+	for i := int(bytesDownloaded/squareSize) + 1; i < 20; i += 1 {
 		barStr += " "
 	}
 	barStr += "]"
