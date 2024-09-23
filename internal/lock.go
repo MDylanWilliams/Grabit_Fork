@@ -150,10 +150,9 @@ func (l *Lock) Download(dir string, tags []string, notags []string, perm string,
 	}
 	errorCh := make(chan error, total)
 
-	statusLine := StatusLine{filteredResources, make(chan int)}
-
+	var statusLine *StatusLine
 	if bar {
-		statusLine.run()
+		statusLine = NewStatusLine(filteredResources)
 	}
 
 	for i, r := range filteredResources {
@@ -163,7 +162,9 @@ func (l *Lock) Download(dir string, tags []string, notags []string, perm string,
 			err := resource.Download(dir, mode, ctx)
 			errorCh <- err
 
-			statusLine.indexCh <- i
+			if bar {
+				statusLine.increment(i)
+			}
 		}()
 	}
 	done := 0

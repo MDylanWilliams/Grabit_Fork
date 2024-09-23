@@ -11,22 +11,46 @@ import (
 
 type StatusLine struct {
 	resources []Resource
-	indexCh   chan int
+
+	resourceSizes       []int64
+	totalBytes          int64
+	sizingSuccess       bool
+	bytesDownloaded     int64
+	resourcesDownloaded int
+	spinI               int
+	indexCh             chan int
+	startTime           time.Time
 }
 
 var spinChars = [5]string{"-", "\\", "|", "/", "-"}
 
-func (st *StatusLine) run() {
-	startTime := time.Now()
+// Create, initialize, and start a new StatusLine.
+func NewStatusLine(resources []Resource) *StatusLine {
+	st := StatusLine{}
+	st.resources = resources
+	st.indexCh = make(chan int)
+	st.resourceSizes, st.totalBytes, st.sizingSuccess = getResourcesSizes(resources, 10000)
 
-	resourceSizes, totalBytes, sizingSuccess := getResourcesSizes(st, 10000)
+	st.start()
 
-	var bytesDownloaded int64
-	resourcesDownloaded := 0
+	return &st
+}
+
+// Inform StatusLine that resource has finished downloading.
+func (st *StatusLine) increment(i int) {
+	st.indexCh <- i
+}
+
+// Begin goroutine and for loop.
+func (st *StatusLine) start() {
+	st.startTime = time.Now()
+
 	go func() {
-		spinI := 0
+		st.spinI = 0
 
 		for {
+
+			//Block until value is inserted into indexCh (>= 0 when resource done downloading, -1 every 50 milliseconds to keep timer and spinner updating).
 			var i int
 			select {
 			case i = <-st.indexCh:
@@ -34,18 +58,22 @@ func (st *StatusLine) run() {
 				i = -1
 			}
 			if i != -1 {
-				bytesDownloaded += resourceSizes[i]
-				resourcesDownloaded++
-			}
-			anyRemaining := resourcesDownloaded < len(st.resources)
-
-			spinI += 1
-			if spinI == len(spinChars) {
-				spinI = 0
+				st.bytesDownloaded += st.resourceSizes[i]
+				st.resourcesDownloaded++
 			}
 
-			line := composeStatusString(bytesDownloaded, totalBytes, resourcesDownloaded, len(st.resources), sizingSuccess, spinChars[:], spinI, startTime, anyRemaining, 20)
+			//Update spinner.
+			st.spinI += 1
+			if st.spinI == len(spinChars) {
+				st.spinI = 0
+			}
+
+			// Print line.
+			anyRemaining := st.resourcesDownloaded < len(st.resources)
+			line := composeStatusString(st.bytesDownloaded, st.totalBytes, st.resourcesDownloaded, len(st.resources), st.sizingSuccess, spinChars[:], st.spinI, st.startTime, anyRemaining, 20)
 			fmt.Print(line)
+
+			//Exit if done.
 			if !anyRemaining {
 				fmt.Println()
 				break
@@ -56,15 +84,16 @@ func (st *StatusLine) run() {
 
 }
 
-func getResourcesSizes(st *StatusLine, timeoutMs int) ([]int64, int64, bool) {
+func getResourcesSizes(resources []Resource, timeoutMs int) ([]int64, int64, bool) {
 	fmt.Print("\rFetching resource sizes...")
-	resourceSizes := make([]int64, len(st.resources))
+	resourceSizes := make([]int64, len(resources))
 	for i := 0; i < len(resourceSizes); i++ {
 		resourceSizes[i] = 0
 	}
+
 	var totalBytes int64 = 0
 	sizingSuccess := true
-	for i, r := range st.resources {
+	for i, r := range resources {
 		resource := r
 		httpClient := &http.Client{Timeout: time.Duration(timeoutMs) * time.Millisecond}
 		resp, err := httpClient.Head(resource.Urls[0])
