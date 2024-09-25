@@ -6,6 +6,7 @@ package internal
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -168,16 +169,21 @@ func (l *Lock) Download(dir string, tags []string, notags []string, perm string,
 		}()
 	}
 	done := 0
-	for err := range errorCh {
+	errs := []error{}
+	for range total {
+		err = <-errorCh
 		if err != nil {
-			return err
-		}
-		done += 1
-		if done == total {
-			return nil
+			errs = append(errs, err)
+		} else {
+			done += 1
 		}
 	}
-
+	if done == total {
+		return nil
+	}
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
 	return nil
 }
 

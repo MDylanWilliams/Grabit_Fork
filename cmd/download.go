@@ -9,40 +9,55 @@ import (
 )
 
 func init() {
-	rootCmd.AddCommand(downloadCmd)
+func addDownload(cmd *cobra.Command) {
+	downloadCmd := &cobra.Command{
+		Use:   "download",
+		Short: "Download defined resources",
+		Args:  cobra.NoArgs,
+		RunE:  runFetch,
+	}
 
-	//Progress bar and accompanying status updates will not show unless "--status" or "-s" flag is used.
 	downloadCmd.Flags().BoolP("status", "s", false, "Continuously display bytes/resources downloaded, time elapsed, and progress bar")
 	downloadCmd.Flags().Lookup("status").NoOptDefVal = "true"
-
-	downloadCmd.Flags().String("dir", ".", "Target directory where to store the files")
+  downloadCmd.Flags().String("dir", ".", "Target directory where to store the files")
 	downloadCmd.Flags().StringArray("tag", []string{}, "Only download the resources with the given tag")
 	downloadCmd.Flags().StringArray("notag", []string{}, "Only download the resources without the given tag")
 	downloadCmd.Flags().String("perm", "", "Optional permissions for the downloaded files (e.g. '644')")
+	cmd.AddCommand(downloadCmd)
 }
 
-var downloadCmd = &cobra.Command{
-	Use:   "download",
-	Short: "Download defined resources",
-	Args:  cobra.NoArgs,
-	Run:   runFetch,
-}
-
-func runFetch(cmd *cobra.Command, args []string) {
+func runFetch(cmd *cobra.Command, args []string) error {
 	lockFile, err := cmd.Flags().GetString("lock-file")
-	FatalIfNotNil(err)
+	if err != nil {
+		return err
+	}
 	lock, err := internal.NewLock(lockFile, false)
-	FatalIfNotNil(err)
+	if err != nil {
+		return err
+	}
 	dir, err := cmd.Flags().GetString("dir")
-	FatalIfNotNil(err)
+	if err != nil {
+		return err
+	}
 	tags, err := cmd.Flags().GetStringArray("tag")
-	FatalIfNotNil(err)
+	if err != nil {
+		return err
+	}
 	notags, err := cmd.Flags().GetStringArray("notag")
-	FatalIfNotNil(err)
+	if err != nil {
+		return err
+	}
 	perm, err := cmd.Flags().GetString("perm")
-	FatalIfNotNil(err)
-	bar, err := cmd.Flags().GetBool("status")
-	FatalIfNotNil(err)
+	if err != nil {
+		return err
+	}
+  bar, err := cmd.Flags().GetBool("status")
+  if err != nil {
+    return err
+  }
 	err = lock.Download(dir, tags, notags, perm, bar)
-	FatalIfNotNil(err)
+	if err != nil {
+		return err
+	}
+	return nil
 }
