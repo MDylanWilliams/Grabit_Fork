@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -20,15 +21,17 @@ type StatusLine struct {
 	indexCh                chan int
 	startTime              time.Time
 	sizingErr              error
+	ctx                    context.Context
 }
 
 var spinChars = [5]string{"-", "\\", "|", "/", "-"}
 
 // NewStatusLine creates, initializes, and starts a new StatusLine.
-func NewStatusLine(resources []Resource) (*StatusLine, error) {
+func NewStatusLine(resources []Resource, ctx context.Context) (*StatusLine, error) {
 	st := StatusLine{}
 	st.resources = resources
 	st.indexCh = make(chan int)
+	st.ctx = ctx
 	st.getResourcesSizes(resources, 10000)
 	st.start()
 	return &st, st.sizingErr
@@ -54,6 +57,8 @@ func (st *StatusLine) start() {
 			case i = <-st.indexCh:
 			case <-time.After(50 * time.Millisecond):
 				i = -1
+			case <-st.ctx.Done():
+				return
 			}
 			if i != -1 {
 				st.numBytesDownloaded += st.resourceSizes[i]
@@ -71,7 +76,7 @@ func (st *StatusLine) start() {
 
 			if st.numResourcesDownloaded == len(st.resources) {
 				fmt.Println()
-				break
+				return
 			}
 
 		}
