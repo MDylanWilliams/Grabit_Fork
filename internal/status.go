@@ -25,15 +25,15 @@ type StatusLine struct {
 }
 
 var spinChars = [5]string{"-", "\\", "|", "/", "-"}
+var timeoutMs = 1000
 
-// NewStatusLine creates, initializes, and starts a new StatusLine.
-func NewStatusLine(resources []Resource, ctx context.Context) (*StatusLine, error) {
+// NewStatusLine creates and initializes a new StatusLine.
+func NewStatusLine(ctx context.Context, resources []Resource) (*StatusLine, error) {
 	st := StatusLine{}
 	st.resources = resources
 	st.indexCh = make(chan int)
 	st.ctx = ctx
-	st.getResourcesSizes(resources, 10000)
-	st.start()
+	st.sizingErr = st.initResourcesSizes(resources)
 	return &st, st.sizingErr
 }
 
@@ -42,15 +42,13 @@ func (st *StatusLine) Increment(i int) {
 	st.indexCh <- i
 }
 
-// start begins the goroutine and loop that will update/print the status line.
-func (st *StatusLine) start() {
+// Start begins the goroutine and loop that will update/print the status line.
+func (st *StatusLine) Start(doTick bool) {
 	st.startTime = time.Now()
-
 	go func() {
 		st.spinI = 0
-
+		fmt.Print(st.GetStatusString())
 		for {
-
 			// Block until value is inserted into indexCh (>= 0 when resource finishes downloading, -1 every 50 milliseconds to keep timer and spinner updating).
 			var i int
 			select {
@@ -59,6 +57,9 @@ func (st *StatusLine) start() {
 				i = -1
 			case <-st.ctx.Done():
 				return
+			}
+			if i == -1 && !doTick {
+				continue
 			}
 			if i != -1 {
 				st.numBytesDownloaded += st.resourceSizes[i]
@@ -71,8 +72,7 @@ func (st *StatusLine) start() {
 				st.spinI = 0
 			}
 
-			line := st.composeStatusString()
-			fmt.Print(line)
+			fmt.Print(st.GetStatusString())
 
 			if st.numResourcesDownloaded == len(st.resources) {
 				fmt.Println()
@@ -84,7 +84,9 @@ func (st *StatusLine) start() {
 
 }
 
-func (st *StatusLine) getResourcesSizes(resources []Resource, timeoutMs int) {
+// initResourceSizes fetches the size, in bytes, of each resource in the provided list.
+// An error, if encountered, is stored in sizingErr.
+func (st *StatusLine) initResourcesSizes(resources []Resource) error {
 	fmt.Print("\rFetching resource sizes...")
 	st.resourceSizes = make([]int64, len(resources))
 	for i := 0; i < len(st.resourceSizes); i++ {
@@ -97,15 +99,17 @@ func (st *StatusLine) getResourcesSizes(resources []Resource, timeoutMs int) {
 		httpClient := &http.Client{Timeout: time.Duration(timeoutMs) * time.Millisecond}
 		resp, err := httpClient.Head(resource.Urls[0])
 		if err != nil {
-			st.sizingErr = err
-			return
+			return err
 		}
 		st.totalBytes += resp.ContentLength
 		st.resourceSizes[i] = resp.ContentLength
 	}
+
+	return nil
 }
 
-func (st *StatusLine) composeStatusString() string {
+// GetStatusString composes and returns the status line string for printing.
+func (st *StatusLine) GetStatusString() string {
 	var spinner string
 	if st.numResourcesDownloaded < len(st.resources) {
 		spinner = spinChars[st.spinI]
@@ -139,7 +143,7 @@ func (st *StatusLine) composeStatusString() string {
 		byteStr = "<issue_fetching_resource_sizes>"
 	}
 
-	elapsedStr := strconv.Itoa(int(time.Since(st.startTime).Round(time.Second).Seconds())) + "s Elapsed"
+	elapsedStr := strconv.Itoa(int(time.Since(st.startTime).Round(time.Second).Seconds())) + "s elapsed"
 
 	pad := "          "
 	line := "\r" + spinner + barStr + pad + completeStr + pad + byteStr + pad + elapsedStr // "\r" lets us clear the line.
