@@ -26,7 +26,7 @@ func TestGetStatusString(t *testing.T) {
 	assert.Len(t, resources, 1000)
 
 	// Test StatusLine initialization and initResourcesSizes().
-	st, err := NewStatusLine(ctx, resources)
+	st, err := NewStatusLine(ctx, &resources)
 	assert.Nil(t, err)
 
 	// Test GetStatusString() and Increment().
