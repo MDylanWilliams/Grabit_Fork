@@ -155,9 +155,11 @@ func (l *Lock) Download(dir string, tags []string, notags []string, perm string,
 	if status {
 		statusLine, err = NewStatusLine(ctx, &filteredResources)
 		if err != nil {
-			return err // Do not continue if resource sizing failed.
+			statusLine = nil
+		} else {
+			statusLine.Start(true)
 		}
-		statusLine.Start(true)
+
 	}
 
 	for i, r := range filteredResources {

@@ -99,6 +99,7 @@ func (st *StatusLine) initResourcesSizes() error {
 		httpClient := &http.Client{Timeout: time.Duration(timeoutMs) * time.Millisecond}
 		resp, err := httpClient.Head(resource.Urls[0])
 		if err != nil {
+			fmt.Println("\rError fetching resource sizes")
 			return err
 		}
 		st.totalBytes += resp.ContentLength
@@ -118,35 +119,34 @@ func (st *StatusLine) GetStatusString() string {
 	}
 
 	barStr := "["
-	barLength := 20
-	if st.totalBytes < 20 {
-		barLength = int(st.totalBytes)
-	}
-	squareSize := st.totalBytes / int64(barLength)
-	for i := 0; i < int(st.numBytesDownloaded/squareSize); i += 1 {
-		barStr += "█"
-	}
-	if st.numResourcesDownloaded < len(*st.resources) {
-		barStr += " "
-	}
-	for i := int(st.numBytesDownloaded/squareSize) + 1; i < barLength; i += 1 {
-		barStr += " "
+	if st.sizingErr == nil {
+		barLength := 20
+		if st.totalBytes < 20 {
+			barLength = int(st.totalBytes)
+		}
+		squareSize := st.totalBytes / int64(barLength)
+		for i := 0; i < int(st.numBytesDownloaded/squareSize); i += 1 {
+			barStr += "█"
+		}
+		if st.numResourcesDownloaded < len(*st.resources) {
+			barStr += " "
+		}
+		for i := int(st.numBytesDownloaded/squareSize) + 1; i < barLength; i += 1 {
+			barStr += " "
+		}
 	}
 	barStr += "]"
 
 	completeStr := strconv.Itoa(st.numResourcesDownloaded) + "/" + strconv.Itoa(len(*st.resources)) + " Resources"
-
-	var byteStr string
-	if st.sizingErr == nil {
-		byteStr = humanize.Bytes(uint64(st.numBytesDownloaded)) + " / " + humanize.Bytes(uint64(st.totalBytes))
-	} else {
-		byteStr = "<issue_fetching_resource_sizes>"
-	}
-
+	byteStr := humanize.Bytes(uint64(st.numBytesDownloaded)) + " / " + humanize.Bytes(uint64(st.totalBytes))
 	elapsedStr := strconv.Itoa(int(time.Since(st.startTime).Round(time.Second).Seconds())) + "s elapsed"
 
 	pad := "          "
-	line := "\r" + spinner + barStr + pad + completeStr + pad + byteStr + pad + elapsedStr // "\r" lets us clear the line.
-
+	var line string
+	if st.sizingErr == nil {
+		line = "\r" + spinner + barStr + pad + completeStr + pad + byteStr + pad + elapsedStr // "\r" lets us clear the line.
+	} else {
+		line = "\r" + spinner + "[]" + pad + completeStr + pad + elapsedStr
+	}
 	return line
 }
