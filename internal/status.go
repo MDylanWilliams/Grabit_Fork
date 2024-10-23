@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/dustin/go-humanize"
@@ -21,6 +22,7 @@ type StatusLine struct {
 	startTime              time.Time
 	sizingErr              error
 	ctx                    context.Context
+	mtx                    sync.Mutex
 }
 
 var spinChars = [5]string{"-", "\\", "|", "/", "-"}
@@ -46,7 +48,6 @@ func (st *StatusLine) Increment(i int) {
 func (st *StatusLine) Start(doTick bool) {
 	st.startTime = time.Now()
 	go func() {
-		st.spinI = 0
 		fmt.Print(st.GetStatusString())
 		for {
 			// Block until value is inserted into indexCh (>= 0 when resource finishes downloading, -1 every 50 milliseconds to keep timer and spinner updating).
@@ -61,6 +62,8 @@ func (st *StatusLine) Start(doTick bool) {
 			if i == -1 && !doTick {
 				continue
 			}
+
+			st.mtx.Lock()
 			if i != -1 {
 				st.numBytesDownloaded += st.resourceSizes[i]
 				st.numResourcesDownloaded++
@@ -71,9 +74,9 @@ func (st *StatusLine) Start(doTick bool) {
 			if st.spinI == len(spinChars) {
 				st.spinI = 0
 			}
+			st.mtx.Unlock()
 
 			fmt.Print(st.GetStatusString())
-
 			if st.numResourcesDownloaded == len(*st.resources) {
 				fmt.Println()
 				return
@@ -111,6 +114,9 @@ func (st *StatusLine) initResourcesSizes() error {
 
 // GetStatusString composes and returns the status line string for printing.
 func (st *StatusLine) GetStatusString() string {
+	st.mtx.Lock()
+	defer st.mtx.Unlock()
+
 	var spinner string
 	if st.numResourcesDownloaded < len(*st.resources) {
 		spinner = spinChars[st.spinI]
