@@ -22,7 +22,7 @@ type StatusLine struct {
 	startTime              time.Time
 	sizingErr              error
 	ctx                    context.Context
-	mtx                    sync.Mutex
+	mtx                    sync.RWMutex
 }
 
 var spinChars = [5]string{"-", "\\", "|", "/", "-"}
@@ -87,8 +87,7 @@ func (st *StatusLine) Start(doTick bool) {
 
 }
 
-// initResourceSizes fetches the size, in bytes, of each resource in the provided list.
-// An error, if encountered, is stored in sizingErr.
+// initResourceSizes fetches the size, in bytes, of each resource.
 func (st *StatusLine) initResourcesSizes() error {
 	fmt.Print("\rFetching resource sizes...")
 	st.resourceSizes = make([]int64, len(*st.resources))
@@ -114,8 +113,8 @@ func (st *StatusLine) initResourcesSizes() error {
 
 // GetStatusString composes and returns the status line string for printing.
 func (st *StatusLine) GetStatusString() string {
-	st.mtx.Lock()
-	defer st.mtx.Unlock()
+	st.mtx.RLock()
+	defer st.mtx.RUnlock()
 
 	var spinner string
 	if st.numResourcesDownloaded < len(*st.resources) {
