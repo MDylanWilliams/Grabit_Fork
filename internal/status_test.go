@@ -22,8 +22,12 @@ func TestGetStatusString(t *testing.T) {
 	}
 	ctx, _ := context.WithCancel(context.Background())
 
-	// Test StatusLine initialization and initResourcesSizes().
-	st, err := NewStatusLine(ctx, &resources)
+	st := NewStatusLine(ctx, &resources)
+
+	// Test InitResourceSizes.
+	err := st.InitResourcesSizes(1)
+	assert.NotNil(t, err)
+	err = st.InitResourcesSizes(1000)
 	assert.Nil(t, err)
 
 	// Test GetStatusString() and Increment().

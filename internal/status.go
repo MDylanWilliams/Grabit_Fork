@@ -26,18 +26,16 @@ type StatusLine struct {
 }
 
 var spinChars = [5]string{"-", "\\", "|", "/", "-"}
-var timeoutMs = 1000
 
 const tickMs = 50
 
 // NewStatusLine creates and initializes a new StatusLine.
-func NewStatusLine(ctx context.Context, resources *[]Resource) (*StatusLine, error) {
+func NewStatusLine(ctx context.Context, resources *[]Resource) *StatusLine {
 	st := StatusLine{}
 	st.resources = resources
 	st.indexCh = make(chan int)
 	st.ctx = ctx
-	st.sizingErr = st.initResourcesSizes()
-	return &st, st.sizingErr
+	return &st
 }
 
 // Increment informs the StatusLine that a resource (at index i in resource list) has finished downloading.
@@ -90,7 +88,7 @@ func (st *StatusLine) Start(doTick bool) {
 }
 
 // initResourceSizes fetches the size, in bytes, of each resource.
-func (st *StatusLine) initResourcesSizes() error {
+func (st *StatusLine) InitResourcesSizes(timeoutMs int) error {
 	fmt.Print("\rFetching resource sizes...")
 	st.resourceSizes = make([]int64, len(*st.resources))
 	for i := 0; i < len(st.resourceSizes); i++ {
