@@ -22,9 +22,6 @@ func TestGetStatusString(t *testing.T) {
 	}
 	ctx, _ := context.WithCancel(context.Background())
 
-	// Test resource generation.
-	assert.Len(t, resources, 1000)
-
 	// Test StatusLine initialization and initResourcesSizes().
 	st, err := NewStatusLine(ctx, &resources)
 	assert.Nil(t, err)

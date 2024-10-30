@@ -28,6 +28,8 @@ type StatusLine struct {
 var spinChars = [5]string{"-", "\\", "|", "/", "-"}
 var timeoutMs = 1000
 
+const tickMs = 50
+
 // NewStatusLine creates and initializes a new StatusLine.
 func NewStatusLine(ctx context.Context, resources *[]Resource) (*StatusLine, error) {
 	st := StatusLine{}
@@ -54,7 +56,7 @@ func (st *StatusLine) Start(doTick bool) {
 			var i int
 			select {
 			case i = <-st.indexCh:
-			case <-time.After(50 * time.Millisecond):
+			case <-time.After(tickMs * time.Millisecond):
 				i = -1
 			case <-st.ctx.Done():
 				return
