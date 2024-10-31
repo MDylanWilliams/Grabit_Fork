@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/dustin/go-humanize"
+	"github.com/rs/zerolog/log"
 )
 
 type StatusLine struct {
@@ -89,7 +90,7 @@ func (st *StatusLine) Start(doTick bool) {
 
 // initResourceSizes fetches the size, in bytes, of each resource.
 func (st *StatusLine) InitResourcesSizes(timeoutMs int) error {
-	fmt.Print("\rFetching resource sizes...")
+	log.Debug().Msg("Fetching resource sizes")
 	st.resourceSizes = make([]int64, len(*st.resources))
 	for i := 0; i < len(st.resourceSizes); i++ {
 		st.resourceSizes[i] = 0
@@ -101,7 +102,7 @@ func (st *StatusLine) InitResourcesSizes(timeoutMs int) error {
 		httpClient := &http.Client{Timeout: time.Duration(timeoutMs) * time.Millisecond}
 		resp, err := httpClient.Head(resource.Urls[0])
 		if err != nil {
-			fmt.Println("\rError fetching resource sizes")
+			log.Debug().Msg("Error fetching resource sizes")
 			return err
 		}
 		st.totalBytes += resp.ContentLength

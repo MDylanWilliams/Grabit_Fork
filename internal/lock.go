@@ -154,9 +154,9 @@ func (l *Lock) Download(dir string, tags []string, notags []string, perm string,
 	var statusLine *StatusLine
 	if status {
 		statusLine = NewStatusLine(ctx, &filteredResources)
-		err = statusLine.InitResourcesSizes(1000)
+		err := statusLine.InitResourcesSizes(1000)
 		if err != nil {
-			statusLine = nil // If error encountered while sizing, do not update or display SL.
+			statusLine = nil // Do not update or display SL.
 		} else {
 			statusLine.Start(true)
 		}
