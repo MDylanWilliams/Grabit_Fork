@@ -15,9 +15,7 @@ func TestSLWith2Resources(t *testing.T) {
 	resources := createResources(2, t)
 	ctx, _ := context.WithCancel(context.Background())
 	st1 := NewStatusLine(ctx, &resources)
-	err := st1.InitResourcesSizes(1)
-	assert.NotNil(t, err)
-	err = st1.InitResourcesSizes(1000)
+	err := st1.InitResourcesSizes()
 	assert.Nil(t, err)
 
 	st1.Start(false)
@@ -35,9 +33,7 @@ func TestSLWith1000Resources(t *testing.T) {
 	resources := createResources(1000, t)
 	ctx, _ := context.WithCancel(context.Background())
 	st2 := NewStatusLine(ctx, &resources)
-	err := st2.InitResourcesSizes(1)
-	assert.NotNil(t, err)
-	err = st2.InitResourcesSizes(1000)
+	err := st2.InitResourcesSizes()
 	assert.Nil(t, err)
 
 	st2.Start(false)
@@ -58,6 +54,21 @@ func TestSLWith1000Resources(t *testing.T) {
 		st2.Increment(i)
 	}
 	assert.Equal(t, "\r✔[████████████████████]          1000/1000 Resources          6.0 kB / 6.0 kB          0s elapsed", st2.GetStatusString())
+}
+
+func TestSLWithCancelledContext(t *testing.T) {
+	resources := createResources(2, t)
+	ctx, cancel := context.WithCancel(context.Background())
+	st := NewStatusLine(ctx, &resources)
+	err := st.InitResourcesSizes()
+	assert.Nil(t, err)
+
+	assert.Equal(t, false, st.isRunning.Load())
+	st.Start(false)
+	st.Increment(0)
+	cancel()
+	time.Sleep(100 * time.Millisecond)
+	assert.NotEqual(t, true, st.isRunning.Load())
 }
 
 func createResources(num int, t *testing.T) []Resource {

@@ -154,11 +154,11 @@ func (l *Lock) Download(dir string, tags []string, notags []string, perm string,
 	var statusLine *StatusLine
 	if status {
 		statusLine = NewStatusLine(ctx, &filteredResources)
-		err := statusLine.InitResourcesSizes(1000)
-		if err != nil {
-			statusLine = nil // Do not update or display SL.
-		} else {
+		err := statusLine.InitResourcesSizes()
+		if err == nil {
 			statusLine.Start(true)
+		} else {
+			statusLine = nil // Do not update or display SL.
 		}
 	}
 

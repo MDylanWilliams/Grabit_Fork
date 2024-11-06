@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/dustin/go-humanize"
@@ -20,6 +21,7 @@ type StatusLine struct {
 	numResourcesDownloaded int
 	spinI                  int
 	indexCh                chan int
+	isRunning              atomic.Bool
 	startTime              time.Time
 	sizingErr              error
 	ctx                    context.Context
@@ -29,6 +31,7 @@ type StatusLine struct {
 var spinChars = [5]string{"-", "\\", "|", "/", "-"}
 
 const tickMs = 50
+const timeoutMs = 1000
 
 // NewStatusLine creates and initializes a new StatusLine.
 func NewStatusLine(ctx context.Context, resources *[]Resource) *StatusLine {
@@ -47,6 +50,7 @@ func (st *StatusLine) Increment(i int) {
 // Start begins the goroutine and loop that will update/print the status line.
 // Pass true to force SL to update (spinner and second counter) every 50ms.
 func (st *StatusLine) Start(doTick bool) {
+	st.isRunning.Store(true)
 	st.startTime = time.Now()
 	go func() {
 		fmt.Print(st.GetStatusString())
@@ -54,11 +58,12 @@ func (st *StatusLine) Start(doTick bool) {
 			// Block until value is inserted into indexCh (>= 0 when resource finishes downloading, -1 every 50 milliseconds to keep timer and spinner updating).
 			var i int
 			select {
+			case <-st.ctx.Done():
+				st.Stop()
+				return
 			case i = <-st.indexCh:
 			case <-time.After(tickMs * time.Millisecond):
 				i = -1
-			case <-st.ctx.Done():
-				return
 			}
 			if i == -1 && !doTick {
 				continue
@@ -80,6 +85,7 @@ func (st *StatusLine) Start(doTick bool) {
 			fmt.Print(st.GetStatusString())
 			if st.numResourcesDownloaded == len(*st.resources) {
 				fmt.Println()
+				st.Stop()
 				return
 			}
 
@@ -88,8 +94,12 @@ func (st *StatusLine) Start(doTick bool) {
 
 }
 
+func (st *StatusLine) Stop() {
+	st.isRunning.Store(false)
+}
+
 // initResourceSizes fetches the size, in bytes, of each resource.
-func (st *StatusLine) InitResourcesSizes(timeoutMs int) error {
+func (st *StatusLine) InitResourcesSizes() error {
 	log.Debug().Msg("Fetching resource sizes")
 	st.resourceSizes = make([]int64, len(*st.resources))
 	for i := 0; i < len(st.resourceSizes); i++ {
