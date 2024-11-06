@@ -125,7 +125,7 @@ func (st *StatusLine) GetStatusString() string {
 	}
 
 	barStr := "["
-	if st.sizingErr == nil {
+	if st.sizingErr == nil && st.totalBytes > 0 {
 		barLength := 20
 		if st.totalBytes < 20 {
 			barLength = int(st.totalBytes)
@@ -134,10 +134,7 @@ func (st *StatusLine) GetStatusString() string {
 		for i := 0; i < int(st.numBytesDownloaded/squareSize); i += 1 {
 			barStr += "█"
 		}
-		if st.numResourcesDownloaded < len(*st.resources) {
-			barStr += " "
-		}
-		for i := int(st.numBytesDownloaded/squareSize) + 1; i < barLength; i += 1 {
+		for i := int(st.numBytesDownloaded / squareSize); i < barLength; i += 1 {
 			barStr += " "
 		}
 	}
