@@ -20,7 +20,6 @@ type StatusLine struct {
 	numBytesDownloaded     int64
 	numResourcesDownloaded int
 	spinI                  int
-	indexCh                chan int
 	isRunning              atomic.Bool
 	startTime              time.Time
 	sizingErr              error
@@ -28,8 +27,7 @@ type StatusLine struct {
 	mtx                    sync.RWMutex
 }
 
-var spinChars = [5]string{"-", "\\", "|", "/", "-"}
-
+const spinChars = "-\\|/"
 const tickMs = 50
 const timeoutMs = 1000
 
@@ -37,14 +35,24 @@ const timeoutMs = 1000
 func NewStatusLine(ctx context.Context, resources *[]Resource) *StatusLine {
 	st := StatusLine{}
 	st.resources = resources
-	st.indexCh = make(chan int)
 	st.ctx = ctx
 	return &st
 }
 
 // Increment informs the StatusLine that a resource (at index i in resource list) has finished downloading.
+// The SL is printed and Stopped if all resources are downloaded.
 func (st *StatusLine) Increment(i int) {
-	st.indexCh <- i
+	st.mtx.Lock()
+	st.numBytesDownloaded += st.resourceSizes[i]
+	st.numResourcesDownloaded++
+	st.mtx.Unlock()
+
+	fmt.Print(st.GetStatusString())
+	if st.numResourcesDownloaded == len(*st.resources) {
+		fmt.Println()
+		st.Stop()
+		return
+	}
 }
 
 // Start begins the goroutine and loop that will update/print the status line.
@@ -55,40 +63,21 @@ func (st *StatusLine) Start(doTick bool) {
 	go func() {
 		fmt.Print(st.GetStatusString())
 		for {
-			// Block until value is inserted into indexCh (>= 0 when resource finishes downloading, -1 every 50 milliseconds to keep timer and spinner updating).
-			var i int
 			select {
 			case <-st.ctx.Done():
 				st.Stop()
 				return
-			case i = <-st.indexCh:
 			case <-time.After(tickMs * time.Millisecond):
-				i = -1
-			}
-			if i == -1 && !doTick {
-				continue
+				if !doTick {
+					continue
+				}
 			}
 
 			st.mtx.Lock()
-			if i != -1 {
-				st.numBytesDownloaded += st.resourceSizes[i]
-				st.numResourcesDownloaded++
-			}
-
-			// Update/rotate spinner.
-			st.spinI += 1
-			if st.spinI == len(spinChars) {
-				st.spinI = 0
-			}
+			st.spinI = (st.spinI + 1) % len(spinChars)
 			st.mtx.Unlock()
 
 			fmt.Print(st.GetStatusString())
-			if st.numResourcesDownloaded == len(*st.resources) {
-				fmt.Println()
-				st.Stop()
-				return
-			}
-
 		}
 	}()
 
@@ -129,7 +118,7 @@ func (st *StatusLine) GetStatusString() string {
 
 	var spinner string
 	if st.numResourcesDownloaded < len(*st.resources) {
-		spinner = spinChars[st.spinI]
+		spinner = string(spinChars[st.spinI])
 	} else {
 		spinner = "✔"
 	}
