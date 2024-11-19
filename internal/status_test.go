@@ -10,77 +10,92 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestSLSpinner(t *testing.T) {
+func TestSpinner(t *testing.T) {
 	resources := createResources(1, t)
 	ctx, _ := context.WithCancel(context.Background())
-	st := NewStatusLine(ctx, &resources)
-	err := st.InitResourcesSizes()
+	sl := NewStatusLine(ctx, &resources)
+	err := sl.InitResourcesSizes()
 	assert.Nil(t, err)
 
-	st.Start(true)
-	assert.Equal(t, "\r-[      ]          0/1 Resources          0 B / 6 B          0s elapsed", st.GetStatusString())
+	sl.Start(true)
+	assert.Equal(t, "\r-[      ]          0/1 Resources          0 B / 6 B          0s elapsed", sl.GetStatusString())
 	time.Sleep(60 * time.Millisecond) // Give extra ms to allow SL to update.
-	assert.Equal(t, "\r\\[      ]          0/1 Resources          0 B / 6 B          0s elapsed", st.GetStatusString())
+	assert.Equal(t, "\r\\[      ]          0/1 Resources          0 B / 6 B          0s elapsed", sl.GetStatusString())
 	time.Sleep(60 * time.Millisecond)
-	assert.Equal(t, "\r|[      ]          0/1 Resources          0 B / 6 B          0s elapsed", st.GetStatusString())
+	assert.Equal(t, "\r|[      ]          0/1 Resources          0 B / 6 B          0s elapsed", sl.GetStatusString())
 	time.Sleep(60 * time.Millisecond)
-	assert.Equal(t, "\r/[      ]          0/1 Resources          0 B / 6 B          0s elapsed", st.GetStatusString())
+	assert.Equal(t, "\r/[      ]          0/1 Resources          0 B / 6 B          0s elapsed", sl.GetStatusString())
 	time.Sleep(60 * time.Millisecond)
-	assert.Equal(t, "\r-[      ]          0/1 Resources          0 B / 6 B          0s elapsed", st.GetStatusString())
+	assert.Equal(t, "\r-[      ]          0/1 Resources          0 B / 6 B          0s elapsed", sl.GetStatusString())
 }
 
-func TestSLWith2Resources(t *testing.T) {
+func TestTimer(t *testing.T) {
+	resources := createResources(1, t)
+	ctx, _ := context.WithCancel(context.Background())
+	sl := NewStatusLine(ctx, &resources)
+	err := sl.InitResourcesSizes()
+	assert.Nil(t, err)
+
+	sl.Start(false)
+	assert.Equal(t, "\r-[      ]          0/1 Resources          0 B / 6 B          0s elapsed", sl.GetStatusString())
+	time.Sleep(1000 * time.Millisecond)
+	assert.Equal(t, "\r-[      ]          0/1 Resources          0 B / 6 B          1s elapsed", sl.GetStatusString())
+	time.Sleep(1000 * time.Millisecond)
+	assert.Equal(t, "\r-[      ]          0/1 Resources          0 B / 6 B          2s elapsed", sl.GetStatusString())
+}
+
+func TestCountersWith2Resources(t *testing.T) {
 	resources := createResources(2, t)
 	ctx, _ := context.WithCancel(context.Background())
-	st := NewStatusLine(ctx, &resources)
-	err := st.InitResourcesSizes()
+	sl := NewStatusLine(ctx, &resources)
+	err := sl.InitResourcesSizes()
 	assert.Nil(t, err)
 
-	st.Start(false)
-	assert.Equal(t, "\r-[            ]          0/2 Resources          0 B / 12 B          0s elapsed", st.GetStatusString())
-	st.Increment(0)
-	assert.Equal(t, "\r-[██████      ]          1/2 Resources          6 B / 12 B          0s elapsed", st.GetStatusString())
-	st.Increment(1)
-	assert.Equal(t, "\r✔[████████████]          2/2 Resources          12 B / 12 B          0s elapsed", st.GetStatusString())
+	sl.Start(false)
+	assert.Equal(t, "\r-[            ]          0/2 Resources          0 B / 12 B          0s elapsed", sl.GetStatusString())
+	sl.Increment(0)
+	assert.Equal(t, "\r-[██████      ]          1/2 Resources          6 B / 12 B          0s elapsed", sl.GetStatusString())
+	sl.Increment(1)
+	assert.Equal(t, "\r✔[████████████]          2/2 Resources          12 B / 12 B          0s elapsed", sl.GetStatusString())
 
 }
 
-func TestSLWith1000Resources(t *testing.T) {
+func TestCountersWith1000Resources(t *testing.T) {
 	resources := createResources(1000, t)
 	ctx, _ := context.WithCancel(context.Background())
-	st := NewStatusLine(ctx, &resources)
-	err := st.InitResourcesSizes()
+	sl := NewStatusLine(ctx, &resources)
+	err := sl.InitResourcesSizes()
 	assert.Nil(t, err)
 
-	st.Start(false)
-	assert.Equal(t, "\r-[                    ]          0/1000 Resources          0 B / 6.0 kB          0s elapsed", st.GetStatusString())
-	st.Increment(0)
-	assert.Equal(t, "\r-[                    ]          1/1000 Resources          6 B / 6.0 kB          0s elapsed", st.GetStatusString())
-	st.Increment(1)
-	assert.Equal(t, "\r-[                    ]          2/1000 Resources          12 B / 6.0 kB          0s elapsed", st.GetStatusString())
-	st.Increment(2)
-	assert.Equal(t, "\r-[                    ]          3/1000 Resources          18 B / 6.0 kB          0s elapsed", st.GetStatusString())
-	st.Increment(3)
-	assert.Equal(t, "\r-[                    ]          4/1000 Resources          24 B / 6.0 kB          0s elapsed", st.GetStatusString())
+	sl.Start(false)
+	assert.Equal(t, "\r-[                    ]          0/1000 Resources          0 B / 6.0 kB          0s elapsed", sl.GetStatusString())
+	sl.Increment(0)
+	assert.Equal(t, "\r-[                    ]          1/1000 Resources          6 B / 6.0 kB          0s elapsed", sl.GetStatusString())
+	sl.Increment(1)
+	assert.Equal(t, "\r-[                    ]          2/1000 Resources          12 B / 6.0 kB          0s elapsed", sl.GetStatusString())
+	sl.Increment(2)
+	assert.Equal(t, "\r-[                    ]          3/1000 Resources          18 B / 6.0 kB          0s elapsed", sl.GetStatusString())
+	sl.Increment(3)
+	assert.Equal(t, "\r-[                    ]          4/1000 Resources          24 B / 6.0 kB          0s elapsed", sl.GetStatusString())
 	for i := 4; i < 1000; i++ {
-		st.Increment(i)
+		sl.Increment(i)
 	}
-	assert.Equal(t, st.GetStatusString(), "\r✔[████████████████████]          1000/1000 Resources          6.0 kB / 6.0 kB          0s elapsed")
+	assert.Equal(t, sl.GetStatusString(), "\r✔[████████████████████]          1000/1000 Resources          6.0 kB / 6.0 kB          0s elapsed")
 }
 
-func TestSLWithCancelledContext(t *testing.T) {
+func TestWithCancelledContext(t *testing.T) {
 	resources := createResources(2, t)
 	ctx, cancel := context.WithCancel(context.Background())
-	st := NewStatusLine(ctx, &resources)
-	err := st.InitResourcesSizes()
+	sl := NewStatusLine(ctx, &resources)
+	err := sl.InitResourcesSizes()
 	assert.Nil(t, err)
 
-	assert.Equal(t, false, st.isRunning.Load())
-	st.Start(false)
-	st.Increment(0)
+	assert.Equal(t, false, sl.isRunning.Load())
+	sl.Start(false)
+	sl.Increment(0)
 	cancel()
 	time.Sleep(10 * time.Millisecond) // Give SL time to Stop.
-	assert.NotEqual(t, true, st.isRunning.Load())
+	assert.NotEqual(t, true, sl.isRunning.Load())
 }
 
 func createResources(num int, t *testing.T) []Resource {
