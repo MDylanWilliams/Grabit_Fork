@@ -47,7 +47,7 @@ func (st *StatusLine) Increment(i int) {
 	st.numResourcesDownloaded++
 	st.mtx.Unlock()
 
-	fmt.Print(st.GetStatusString())
+	fmt.Print(st.GetStatusString() + " ")
 	if st.numResourcesDownloaded == len(*st.resources) {
 		fmt.Println()
 		st.Stop()
@@ -77,7 +77,7 @@ func (st *StatusLine) Start(doTick bool) {
 			st.spinI = (st.spinI + 1) % len(spinChars)
 			st.mtx.Unlock()
 
-			fmt.Print(st.GetStatusString())
+			fmt.Print(st.GetStatusString() + " ")
 		}
 	}()
 
